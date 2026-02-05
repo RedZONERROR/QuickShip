@@ -1,5 +1,12 @@
 # QuickShip Deployment Toolkit
 
+[![Test QuickShip](https://github.com/RedZONERROR/QuickShip/actions/workflows/test.yml/badge.svg)](https://github.com/RedZONERROR/QuickShip/actions/workflows/test.yml)
+[![Auto Release](https://github.com/RedZONERROR/QuickShip/actions/workflows/auto-release.yml/badge.svg)](https://github.com/RedZONERROR/QuickShip/actions/workflows/auto-release.yml)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/RedZONERROR/QuickShip)](https://github.com/RedZONERROR/QuickShip/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Bash](https://img.shields.io/badge/bash-5.0+-green.svg)](https://www.gnu.org/software/bash/)
+[![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)](https://www.linux.org/)
+
 A modular, zero-dependency deployment system using only bash and netcat. Deploy services to your VPS with a web interface - no Python, Node.js, PHP, or Docker required.
 
 ## Features
@@ -144,3 +151,33 @@ sudo -v
 ## License
 
 Use at your own risk. No warranty provided.
+
+## Release Process
+
+Releases are **fully automated** using semantic versioning based on commit messages:
+
+### Commit Message Convention
+
+- `feat:` or `feature:` - Bumps **minor** version (e.g., 1.0.0 → 1.1.0)
+- `fix:` or `bugfix:` - Bumps **patch** version (e.g., 1.0.0 → 1.0.1)
+- `breaking:` or `major:` - Bumps **major** version (e.g., 1.0.0 → 2.0.0)
+- Other commits - Bumps **patch** version by default
+
+### Example Commits
+
+```bash
+git commit -m "feat: add file compression support"        # 1.0.0 → 1.1.0
+git commit -m "fix: resolve upload timeout issue"        # 1.0.0 → 1.0.1
+git commit -m "breaking: change API endpoint structure"  # 1.0.0 → 2.0.0
+```
+
+### Automated Workflow
+
+When you push to `main`:
+1. ✅ All tests run automatically
+2. 🔢 Version is calculated from commit messages
+3. 📝 Release notes are generated with categorized changes
+4. 🏷️ Git tag is created and pushed
+5. 🚀 GitHub release is published with installation instructions
+
+No manual version management needed!
