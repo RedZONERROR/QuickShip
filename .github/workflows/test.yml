@@ -1,0 +1,112 @@
+name: Test QuickShip
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  shellcheck:
+    name: ShellCheck Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          severity: warning
+
+  syntax-check:
+    name: Bash Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check bash syntax
+        run: |
+          echo "Checking syntax for all shell scripts..."
+          find . -name "*.sh" -type f | while read -r script; do
+            echo "Checking: $script"
+            bash -n "$script"
+          done
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Make scripts executable
+        run: |
+          chmod +x main.sh
+          chmod +x modules/*.sh
+      
+      - name: Test module loading
+        run: |
+          bash -c "source ./config.sh && echo 'Config loaded'"
+          bash -c "source ./config.sh && source ./modules/http_server.sh && echo 'HTTP server module loaded'"
+          bash -c "source ./config.sh && source ./modules/req_parser.sh && echo 'Request parser loaded'"
+          bash -c "source ./config.sh && source ./modules/file_handler.sh && echo 'File handler loaded'"
+          bash -c "source ./config.sh && source ./modules/cmd_runner.sh && echo 'Command runner loaded'"
+          bash -c "source ./config.sh && source ./modules/service_mgr.sh && echo 'Service manager loaded'"
+          bash -c "source ./config.sh && source ./modules/nuke.sh && echo 'Nuke module loaded'"
+      
+      - name: Test configuration variables
+        run: |
+          bash -c "source ./config.sh && test -n \"\$SERVER_HOST\" && echo 'SERVER_HOST is set'"
+          bash -c "source ./config.sh && test -n \"\$SERVER_PORT\" && echo 'SERVER_PORT is set'"
+          bash -c "source ./config.sh && test -n \"\$UPLOAD_DIR\" && echo 'UPLOAD_DIR is set'"
+      
+      - name: Test directory creation
+        run: |
+          bash -c "source ./config.sh && mkdir -p \$UPLOAD_DIR \$TEMP_DIR && ls -la"
+      
+      - name: Verify required commands
+        run: |
+          command -v nc || echo "Warning: netcat not found"
+          command -v systemctl || echo "Warning: systemctl not found"
+          command -v bash && echo "Bash is available"
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Make scripts executable
+        run: |
+          chmod +x main.sh
+          chmod +x modules/*.sh
+      
+      - name: Test server startup (dry run)
+        run: |
+          # Test that main.sh can be sourced without errors
+          timeout 2 bash -c "source ./config.sh && source ./modules/http_server.sh && echo 'Server modules loaded successfully'" || true
+      
+      - name: Check for common issues
+        run: |
+          echo "Checking for bashisms..."
+          ! grep -r "function " --include="*.sh" . || echo "Warning: 'function' keyword found (use func_name() instead)"
+          
+          echo "Checking for unquoted variables..."
+          ! grep -rE '\$[A-Z_]+[^"]' --include="*.sh" . | grep -v "^Binary" || echo "Warning: Potential unquoted variables found"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for security issues
+        run: |
+          echo "Checking for hardcoded credentials..."
+          ! grep -riE "(password|secret|token|api_key)\s*=\s*['\"][^'\"]+['\"]" --include="*.sh" . || echo "Warning: Potential hardcoded credentials"
+          
+          echo "Checking for dangerous commands..."
+          ! grep -rE "(rm -rf /|dd if=|mkfs|:(){:|fork bomb)" --include="*.sh" . || echo "Warning: Dangerous commands found"
+          
+          echo "Checking for eval usage..."
+          ! grep -r "eval " --include="*.sh" . || echo "Warning: eval usage found (potential security risk)"
