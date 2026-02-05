@@ -33,7 +33,6 @@ handle_request() {
         line=$(echo "$line" | tr -d '\r')
         
         if [ -z "$line" ]; then
-            headers_done=true
             break
         fi
         
