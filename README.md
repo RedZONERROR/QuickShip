@@ -22,7 +22,7 @@ A modular, zero-dependency deployment system using only bash and netcat. Deploy 
 ```bash
 # Clone or upload the entire directory
 cd /opt
-git clone <your-repo> quickship
+git clone https://github.com/RedZONERROR/QuickShip.git quickship
 cd quickship
 ```
 
