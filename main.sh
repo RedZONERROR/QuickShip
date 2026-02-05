@@ -1,6 +1,7 @@
 #!/bin/bash
 # QuickShip Deployment Toolkit - Main Entry Point
 # Zero dependencies - Pure bash + netcat
+# Version: See VERSION file
 
 set -e
 
