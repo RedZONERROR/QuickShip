@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickShip Deployment Toolkit</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #00ff41;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 2px solid #00ff41;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #00ff41;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #00cc33;
+            font-size: 1.1em;
+        }
+
+        .section {
+            background: #0f1419;
+            border: 2px solid #00ff41;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+
+        .section h2 {
+            color: #00ff41;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            text-transform: uppercase;
+            border-bottom: 1px solid #00ff41;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #00cc33;
+            font-weight: bold;
+        }
+
+        input[type="file"],
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            background: #000;
+            border: 2px solid #00ff41;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            border-radius: 4px;
+        }
+
+        input[type="file"]:focus,
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            box-shadow: 0 0 10px #00ff41;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        button {
+            background: #00ff41;
+            color: #0a0e27;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            border-radius: 4px;
+            text-transform: uppercase;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #00cc33;
+            box-shadow: 0 0 15px #00ff41;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .danger-btn {
+            background: #ff0000;
+            color: #fff;
+        }
+
+        .danger-btn:hover {
+            background: #cc0000;
+            box-shadow: 0 0 15px #ff0000;
+        }
+
+        #output,
+        #terminal-output {
+            background: #000;
+            border: 2px solid #00ff41;
+            padding: 15px;
+            min-height: 150px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            color: #00ff41;
+            margin-top: 15px;
+            border-radius: 4px;
+        }
+
+        .status {
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status.success {
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+        }
+
+        .status.error {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
+
+        .danger-zone {
+            border-color: #ff0000;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+        }
+
+        .danger-zone h2 {
+            color: #ff0000;
+            border-bottom-color: #ff0000;
+        }
+
+        .warning {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff0000;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            color: #ff6666;
+        }
+
+        .terminal-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .terminal-input input {
+            flex: 1;
+        }
+
+        .terminal-input button {
+            flex-shrink: 0;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .cursor {
+            animation: blink 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ QUICKSHIP ⚡</h1>
+            <p class="subtitle">Zero-Dependency Deployment Toolkit</p>
+        </header>
+
+        <!-- File Upload Section -->
+        <div class="section">
+            <h2>📦 File Upload & Service Deployment</h2>
+            <form id="upload-form" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="file">Select File:</label>
+                    <input type="file" id="file" name="file" required>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="is_executable" name="is_executable">
+                    <label for="is_executable" style="margin: 0;">Run as Service (Install to /usr/local/bin and create systemd service)</label>
+                </div>
+                
+                <button type="submit">Upload</button>
+                
+                <div id="upload-status" class="status"></div>
+            </form>
+        </div>
+
+        <!-- Web Terminal Section -->
+        <div class="section">
+            <h2>💻 Web Terminal</h2>
+            <div class="terminal-input">
+                <input type="text" id="command-input" placeholder="Enter command..." autocomplete="off">
+                <button onclick="runCommand()">Run Command</button>
+            </div>
+            
+            <div id="terminal-output">> Ready<span class="cursor">_</span></div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="section danger-zone">
+            <h2>☠️ Danger Zone</h2>
+            <div class="warning">
+                <strong>⚠️ WARNING:</strong> This will stop all services, remove all binaries, delete all service files, and completely remove QuickShip from this system. This action cannot be undone!
+            </div>
+            <button class="danger-btn" onclick="confirmNuke()">Nuke Everything</button>
+        </div>
+    </div>
+
+    <script>
+        // File Upload Handler
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('file');
+            const isExecutable = document.getElementById('is_executable').checked;
+            
+            formData.append('file', fileInput.files[0]);
+            if (isExecutable) {
+                formData.append('is_executable', 'on');
+            }
+            
+            const statusDiv = document.getElementById('upload-status');
+            statusDiv.textContent = 'Uploading...';
+            statusDiv.className = 'status';
+            statusDiv.style.display = 'block';
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = '✓ ' + result.message;
+                    if (result.service) {
+                        statusDiv.textContent += '\nService: ' + result.service;
+                    }
+                    fileInput.value = '';
+                    document.getElementById('is_executable').checked = false;
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = '✗ ' + result.message;
+                }
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '✗ Error: ' + error.message;
+            }
+        });
+
+        // Command Runner
+        async function runCommand() {
+            const input = document.getElementById('command-input');
+            const output = document.getElementById('terminal-output');
+            const command = input.value.trim();
+            
+            if (!command) return;
+            
+            output.innerHTML += '\n> ' + command + '\n';
+            
+            try {
+                const response = await fetch('/cmd', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'command=' + encodeURIComponent(command)
+                });
+                
+                const result = await response.json();
+                
+                if (result.output) {
+                    output.innerHTML += result.output + '\n';
+                }
+                
+                output.innerHTML += '> Ready<span class="cursor">_</span>';
+                output.scrollTop = output.scrollHeight;
+                
+                input.value = '';
+            } catch (error) {
+                output.innerHTML += 'Error: ' + error.message + '\n';
+                output.innerHTML += '> Ready<span class="cursor">_</span>';
+            }
+        }
+
+        // Enter key support for terminal
+        document.getElementById('command-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                runCommand();
+            }
+        });
+
+        // Nuke Function
+        async function confirmNuke() {
+            const confirmed = confirm(
+                '⚠️ FINAL WARNING ⚠️\n\n' +
+                'This will:\n' +
+                '• Stop all QuickShip services\n' +
+                '• Remove all installed binaries\n' +
+                '• Delete all service files\n' +
+                '• Completely remove QuickShip\n\n' +
+                'Are you absolutely sure?'
+            );
+            
+            if (!confirmed) return;
+            
+            const doubleConfirm = confirm('Type YES in your mind and click OK to proceed with nuclear option.');
+            
+            if (!doubleConfirm) return;
+            
+            try {
+                await fetch('/nuke', { method: 'POST' });
+                
+                document.body.innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+                        <h1 style="font-size: 4em; color: #ff0000; text-shadow: 0 0 20px #ff0000;">💥 NUKED 💥</h1>
+                        <p style="font-size: 1.5em; margin-top: 20px;">QuickShip has been completely removed from this system.</p>
+                    </div>
+                `;
+            } catch (error) {
+                alert('Nuke initiated. Connection lost.');
+            }
+        }
+    </script>
+</body>
+</html>
