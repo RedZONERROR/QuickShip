@@ -19,12 +19,14 @@ execute_nuke() {
     
     # Remove binaries
     echo "Removing binaries..."
-    for bin in $(ls "$BIN_DIR" 2>/dev/null | grep -v "^$"); do
-        # Only remove files that were likely installed by QuickShip
-        if [ -f "$BIN_DIR/$bin" ]; then
-            sudo rm -f "$BIN_DIR/$bin" 2>/dev/null || true
-        fi
-    done
+    if [ -d "$BIN_DIR" ]; then
+        for bin in "$BIN_DIR"/*; do
+            # Only remove files that were likely installed by QuickShip
+            if [ -f "$bin" ] && [ "$(basename "$bin")" != "*" ]; then
+                sudo rm -f "$bin" 2>/dev/null || true
+            fi
+        done
+    fi
     
     # Reload systemd
     sudo systemctl daemon-reload

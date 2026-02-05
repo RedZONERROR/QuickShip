@@ -5,10 +5,12 @@ parse_and_run_command() {
     local content_length="$1"
     
     # Read POST body
-    local body=$(dd bs=1 count="$content_length" 2>/dev/null)
+    local body
+    body=$(dd bs=1 count="$content_length" 2>/dev/null)
     
     # Parse URL-encoded command
-    local command=$(echo "$body" | sed 's/^command=//' | sed 's/+/ /g')
+    local command
+    command=$(echo "$body" | sed 's/^command=//' | sed 's/+/ /g')
     command=$(printf '%b' "${command//%/\\x}")
     
     if [ -z "$command" ]; then
@@ -17,7 +19,8 @@ parse_and_run_command() {
     fi
     
     # Execute command and capture output
-    local output=$(eval "$command" 2>&1)
+    local output
+    output=$(eval "$command" 2>&1)
     local exit_code=$?
     
     # Escape output for JSON

@@ -22,7 +22,6 @@ handle_request() {
     local content_type=""
     local boundary=""
     local line
-    local headers_done=false
     
     # Read request line
     read -r line
@@ -72,7 +71,8 @@ handle_request() {
 
 serve_dashboard() {
     if [ -f "views/dashboard.html" ]; then
-        local content=$(cat views/dashboard.html)
+        local content
+        content=$(cat views/dashboard.html)
         local length=${#content}
         echo -e "$HTTP_200\r"
         echo -e "Content-Type: text/html\r"
@@ -103,7 +103,8 @@ handle_upload() {
     local content_length="$1"
     local boundary="$2"
     
-    local result=$(parse_upload_request "$content_length" "$boundary")
+    local result
+    result=$(parse_upload_request "$content_length" "$boundary")
     
     if [ $? -eq 0 ]; then
         send_response "200 OK" "application/json" "$result"
@@ -115,7 +116,8 @@ handle_upload() {
 handle_command() {
     local content_length="$1"
     
-    local result=$(parse_and_run_command "$content_length")
+    local result
+    result=$(parse_and_run_command "$content_length")
     
     send_response "200 OK" "application/json" "$result"
 }

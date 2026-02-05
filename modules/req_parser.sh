@@ -8,7 +8,6 @@ parse_upload_request() {
     local temp_file="$TEMP_DIR/upload_$$"
     local filename=""
     local is_executable="false"
-    local in_file_data=false
     local file_output=""
     
     # Read the body
