@@ -79,15 +79,6 @@ jobs:
           echo "Bump type: $BUMP_TYPE"
           echo "New version: $NEW_VERSION"
       
-      - name: Update VERSION file
-        run: |
-          echo "${{ steps.bump.outputs.new_version }}" > VERSION
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add VERSION
-          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }} [skip ci]" || true
-          git push || true
-      
       - name: Generate release notes
         id: notes
         run: |

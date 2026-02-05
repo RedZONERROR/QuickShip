@@ -154,7 +154,7 @@ Use at your own risk. No warranty provided.
 
 ## Release Process
 
-Releases are **fully automated** using semantic versioning based on commit messages:
+Releases are **fully automated** using semantic versioning based on commit messages. Version numbers are managed through **git tags only** - no VERSION file needed.
 
 ### Commit Message Convention
 
@@ -175,9 +175,9 @@ git commit -m "breaking: change API endpoint structure"  # 1.0.0 → 2.0.0
 
 When you push to `main`:
 1. ✅ All tests run automatically
-2. 🔢 Version is calculated from commit messages
+2. 🔢 Version is calculated from the latest git tag and commit messages
 3. 📝 Release notes are generated with categorized changes
-4. 🏷️ Git tag is created and pushed
+4. 🏷️ New git tag is created and pushed
 5. 🚀 GitHub release is published with installation instructions
 
-No manual version management needed!
+**Single source of truth:** Git tags are the only version reference - clean and simple!
