@@ -50,6 +50,9 @@ while (my $client = $socket->accept()) {
     elsif ($method eq 'POST' && $path eq '/exec') {
         handle_command($client, $request);
     }
+    elsif ($method eq 'POST' && $path eq '/destroy') {
+        handle_self_destruct($client, $request);
+    }
     else {
         send_404($client);
     }
@@ -181,6 +184,21 @@ sub serve_html {
             background: #218838;
         }
         .terminal-btn i {
+            margin-right: 8px;
+        }
+        .destroy-btn {
+            margin-top: 10px;
+            text-align: center;
+        }
+        .destroy-btn button {
+            background: #dc3545;
+            width: auto;
+            padding: 10px 20px;
+        }
+        .destroy-btn button:hover {
+            background: #c82333;
+        }
+        .destroy-btn i {
             margin-right: 8px;
         }
         
@@ -328,15 +346,29 @@ sub serve_html {
     <div class="container">
         <h1><i class="fas fa-rocket"></i>Disposable Deployment</h1>
         <div class="warning">
-            <i class="fas fa-exclamation-triangle"></i><strong>Warning:</strong> This server will self-destruct after deployment!
+            <i class="fas fa-exclamation-triangle"></i><strong>Warning:</strong> Checking "Execute" will run the file and self-destruct the server!
         </div>
         <form id="uploadForm" enctype="multipart/form-data">
             <label for="file"><strong>Select executable file:</strong></label>
             <input type="file" id="file" name="file" required>
-            <button type="submit"><i class="fas fa-upload"></i> Deploy & Self-Destruct</button>
+            
+            <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="executeCheckbox" name="execute" checked style="margin-right: 10px; width: 18px; height: 18px; cursor: pointer;">
+                    <span><strong>Execute as application and self-destruct</strong></span>
+                </label>
+                <small style="display: block; margin-top: 5px; color: #6c757d; margin-left: 28px;">
+                    Uncheck to upload file without execution (server stays running)
+                </small>
+            </div>
+            
+            <button type="submit"><i class="fas fa-upload"></i> <span id="btnText">Deploy & Self-Destruct</span></button>
         </form>
         <div class="terminal-btn">
             <button id="openTerminal"><i class="fas fa-terminal"></i>Open Terminal</button>
+        </div>
+        <div class="destroy-btn">
+            <button id="selfDestruct"><i class="fas fa-bomb"></i>Self-Destruct Server</button>
         </div>
         <div class="progress-container" id="progressContainer">
             <div class="progress-bar">
@@ -479,6 +511,55 @@ sub serve_html {
         });
         
         // Upload form handling
+        const executeCheckbox = document.getElementById('executeCheckbox');
+        const btnText = document.getElementById('btnText');
+        const selfDestructBtn = document.getElementById('selfDestruct');
+        
+        // Self-destruct button handler
+        selfDestructBtn.addEventListener('click', function() {
+            const shouldExecute = executeCheckbox.checked;
+            const confirmMsg = shouldExecute 
+                ? 'Are you sure you want to execute the uploaded file and self-destruct the server? This will run app_executable, delete run.pl and stop the server.'
+                : 'Are you sure you want to self-destruct the server? This will delete run.pl and stop the server immediately.';
+            
+            if (confirm(confirmMsg)) {
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Self-Destructing...';
+                
+                fetch('/destroy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'execute=' + (shouldExecute ? '1' : '0')
+                })
+                .then(response => response.text())
+                .then(result => {
+                    alert(result);
+                    const msg = shouldExecute 
+                        ? '<p>The uploaded file has been executed, and run.pl has been deleted.</p>'
+                        : '<p>The server has been stopped and run.pl has been deleted.</p>';
+                    document.body.innerHTML = '<div style="text-align: center; padding: 50px; font-family: Arial;"><h1><i class="fas fa-check-circle" style="color: #28a745;"></i></h1><h2>Server Self-Destructed</h2>' + msg + '</div>';
+                })
+                .catch(error => {
+                    const msg = shouldExecute 
+                        ? 'Self-destruct initiated. File executed and server is shutting down.'
+                        : 'Self-destruct initiated. Server is shutting down.';
+                    alert(msg);
+                    document.body.innerHTML = '<div style="text-align: center; padding: 50px; font-family: Arial;"><h1><i class="fas fa-check-circle" style="color: #28a745;"></i></h1><h2>Server Self-Destructed</h2></div>';
+                });
+            }
+        });
+        
+        // Update button text based on checkbox
+        executeCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                btnText.textContent = 'Deploy & Self-Destruct';
+            } else {
+                btnText.textContent = 'Upload File';
+            }
+        });
+        
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -488,6 +569,7 @@ sub serve_html {
             const progressContainer = document.getElementById('progressContainer');
             const progressFill = document.getElementById('progressFill');
             const progressText = document.getElementById('progressText');
+            const shouldExecute = executeCheckbox.checked;
             
             if (!fileInput.files[0]) {
                 statusDiv.className = 'error';
@@ -505,6 +587,7 @@ sub serve_html {
             
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
+            formData.append('execute', shouldExecute ? '1' : '0');
             
             try {
                 const xhr = new XMLHttpRequest();
@@ -530,17 +613,19 @@ sub serve_html {
                         statusDiv.className = 'success';
                         statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ' + xhr.responseText;
                         statusDiv.style.display = 'block';
-                        button.innerHTML = '<i class="fas fa-check"></i> Deployed!';
+                        button.innerHTML = '<i class="fas fa-check"></i> ' + (shouldExecute ? 'Deployed!' : 'Uploaded!');
                         
-                        setTimeout(() => {
-                            statusDiv.innerHTML += '<br><br>Server has self-destructed. You can close this page.';
-                        }, 1000);
+                        if (shouldExecute) {
+                            setTimeout(() => {
+                                statusDiv.innerHTML += '<br><br>Server has self-destructed. You can close this page.';
+                            }, 1000);
+                        }
                     } else {
                         statusDiv.className = 'error';
                         statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> ' + xhr.responseText;
                         statusDiv.style.display = 'block';
                         button.disabled = false;
-                        button.innerHTML = '<i class="fas fa-upload"></i> Deploy & Self-Destruct';
+                        button.innerHTML = '<i class="fas fa-upload"></i> ' + btnText.textContent;
                     }
                 });
                 
@@ -551,7 +636,7 @@ sub serve_html {
                     statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> Upload failed: Network error';
                     statusDiv.style.display = 'block';
                     button.disabled = false;
-                    button.innerHTML = '<i class="fas fa-upload"></i> Deploy & Self-Destruct';
+                    button.innerHTML = '<i class="fas fa-upload"></i> ' + btnText.textContent;
                 });
                 
                 xhr.open('POST', '/upload');
@@ -563,7 +648,7 @@ sub serve_html {
                 statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> Upload failed: ' + error.message;
                 statusDiv.style.display = 'block';
                 button.disabled = false;
-                button.innerHTML = '<i class="fas fa-upload"></i> Deploy & Self-Destruct';
+                button.innerHTML = '<i class="fas fa-upload"></i> ' + btnText.textContent;
             }
         });
     </script>
@@ -619,6 +704,76 @@ sub handle_command {
     print $client $response;
 }
 
+# Handle self-destruct request
+sub handle_self_destruct {
+    my ($client, $request) = @_;
+    
+    # Extract Content-Length if present
+    my ($content_length) = $request =~ /Content-Length:\s*(\d+)/i;
+    
+    my $should_execute = 0;
+    
+    # Read body if present
+    if ($content_length && $content_length > 0) {
+        my $body = '';
+        read($client, $body, $content_length);
+        
+        # Parse execute parameter
+        if ($body =~ /execute=1/) {
+            $should_execute = 1;
+        }
+    }
+    
+    my $msg = $should_execute 
+        ? "Executing uploaded file and self-destructing. Server shutting down..."
+        : "Self-destruct initiated. Server shutting down...";
+    
+    my $response = "HTTP/1.1 200 OK\r\n";
+    $response .= "Content-Type: text/plain\r\n";
+    $response .= "Content-Length: " . length($msg) . "\r\n";
+    $response .= "Connection: close\r\n\r\n";
+    $response .= $msg;
+    
+    print $client $response;
+    close($client);
+    
+    # Self-destruct sequence
+    print "\n=== SELF-DESTRUCT INITIATED ===\n";
+    
+    # Execute uploaded file if requested
+    if ($should_execute && -f $UPLOAD_FILE) {
+        print "Making $UPLOAD_FILE executable...\n";
+        chmod 0755, $UPLOAD_FILE;
+        
+        print "Executing $UPLOAD_FILE in background...\n";
+        my $pid = fork();
+        if ($pid == 0) {
+            # Child process - execute the app
+            close(STDIN);
+            close(STDOUT);
+            close(STDERR);
+            exec("./$UPLOAD_FILE") or die "Cannot execute: $!";
+        }
+        print "Application started with PID: $pid\n";
+        sleep 1; # Give time for app to start
+    }
+    
+    print "Closing server socket...\n";
+    close($socket);
+    
+    print "Deleting $SCRIPT_PATH...\n";
+    unlink($SCRIPT_PATH) or warn "Cannot delete script: $!";
+    
+    # Try to remove directory if empty
+    if ($SCRIPT_DIR ne '/' && $SCRIPT_DIR ne $ENV{HOME}) {
+        print "Attempting to remove directory $SCRIPT_DIR...\n";
+        rmdir($SCRIPT_DIR); # Only works if empty
+    }
+    
+    print "Self-destruct complete. Goodbye!\n";
+    exit(0);
+}
+
 # Handle file upload
 sub handle_upload {
     my ($client, $request) = @_;
@@ -654,6 +809,8 @@ sub handle_upload {
     my @parts = split(/--\Q$boundary\E/, $body);
     
     my $file_data;
+    my $should_execute = 0;
+    
     foreach my $part (@parts) {
         next if $part =~ /^--/ || $part =~ /^\s*$/;
         
@@ -666,7 +823,11 @@ sub handle_upload {
                 # Remove trailing boundary markers
                 $content =~ s/\r?\n--$//;
                 $file_data = $content;
-                last;
+            }
+            # Check if this is the execute field
+            elsif ($headers =~ /name="execute"/) {
+                $content =~ s/\r?\n--$//;
+                $should_execute = ($content =~ /1/);
             }
         }
     }
@@ -685,11 +846,14 @@ sub handle_upload {
     print $fh $file_data;
     close($fh);
     
-    # Make executable
-    chmod 0755, $UPLOAD_FILE;
+    # Make executable if needed
+    chmod 0755, $UPLOAD_FILE if $should_execute;
     
     # Send success response
-    my $msg = "Deployment successful! Executing and self-destructing...";
+    my $msg = $should_execute 
+        ? "Deployment successful! Executing and self-destructing..." 
+        : "File uploaded successfully! Server is still running.";
+    
     my $response = "HTTP/1.1 200 OK\r\n";
     $response .= "Content-Type: text/plain\r\n";
     $response .= "Content-Length: " . length($msg) . "\r\n";
@@ -699,28 +863,47 @@ sub handle_upload {
     print $client $response;
     close($client);
     
-    # Execute the uploaded file in background
-    print "\nExecuting $UPLOAD_FILE...\n";
-    
-    # Fork and execute
-    my $pid = fork();
-    if ($pid == 0) {
-        # Child process - execute the app
-        close(STDIN);
-        close(STDOUT);
-        close(STDERR);
-        exec("./$UPLOAD_FILE") or die "Cannot execute: $!";
+    # Only execute and self-destruct if checkbox was checked
+    if ($should_execute) {
+        # Execute the uploaded file in background
+        print "\nExecuting $UPLOAD_FILE...\n";
+        
+        # Fork and execute
+        my $pid = fork();
+        if ($pid == 0) {
+            # Child process - execute the app
+            close(STDIN);
+            close(STDOUT);
+            close(STDERR);
+            exec("./$UPLOAD_FILE") or die "Cannot execute: $!";
+        }
+        
+        # Parent process - self-destruct
+        print "Application started with PID: $pid\n";
+        print "Initiating self-destruct sequence...\n";
+        
+        sleep 1; # Give time for response to be sent
+        
+        # Close server socket
+        close($socket);
+        
+        # Self-destruct
+        print "Deleting $SCRIPT_PATH...\n";
+        unlink($SCRIPT_PATH) or warn "Cannot delete script: $!";
+        
+        # Try to remove directory if empty
+        if ($SCRIPT_DIR ne '/' && $SCRIPT_DIR ne $ENV{HOME}) {
+            print "Attempting to remove directory $SCRIPT_DIR...\n";
+            rmdir($SCRIPT_DIR); # Only works if empty
+        }
+        
+        print "Self-destruct complete. Goodbye!\n";
+        exit(0);
+    } else {
+        # Just uploaded, server continues running
+        print "\nFile uploaded as $UPLOAD_FILE (not executed)\n";
     }
-    
-    # Parent process - self-destruct
-    print "Application started with PID: $pid\n";
-    print "Initiating self-destruct sequence...\n";
-    
-    sleep 1; # Give time for response to be sent
-    
-    # Close server socket
-    close($socket);
-    
+}
     # Self-destruct
     print "Deleting $SCRIPT_PATH...\n";
     unlink($SCRIPT_PATH) or warn "Cannot delete script: $!";
