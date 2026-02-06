@@ -1,9 +1,13 @@
-name: Create Release
+name: Auto Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
+      - '.github/**'
 
 permissions:
   contents: write
@@ -14,14 +18,213 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Create Release
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          # Get the latest tag or default to v0.0.0
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG"
+
+      - name: Determine version bump
+        id: bump
+        run: |
+          LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
+          
+          # Remove 'v' prefix and split version
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          
+          # Get commits since last tag
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            COMMITS=$(git log --pretty=format:"%s" --no-merges)
+          else
+            COMMITS=$(git log ${LATEST_TAG}..HEAD --pretty=format:"%s" --no-merges)
+          fi
+          
+          # Check if there are any commits
+          if [ -z "$COMMITS" ]; then
+            echo "No new commits since last release"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Determine bump type from commit messages
+          BUMP_TYPE="patch"
+          
+          if echo "$COMMITS" | grep -qiE "^(breaking|major):"; then
+            BUMP_TYPE="major"
+          elif echo "$COMMITS" | grep -qiE "^(feat|feature):"; then
+            BUMP_TYPE="minor"
+          fi
+          
+          # Calculate new version
+          case $BUMP_TYPE in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          NEW_TAG="v$NEW_VERSION"
+          
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+          
+          echo "Bump type: $BUMP_TYPE"
+          echo "New version: $NEW_VERSION"
+
+      - name: Generate release notes
+        if: steps.bump.outputs.skip != 'true'
+        id: notes
+        run: |
+          LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
+          NEW_TAG="${{ steps.bump.outputs.new_tag }}"
+          BUMP_TYPE="${{ steps.bump.outputs.bump_type }}"
+          
+          # Get commits
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log ${LATEST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          
+          # Categorize commits
+          FEATURES=$(echo "$COMMITS" | grep -iE "^- (feat|feature):" || true)
+          FIXES=$(echo "$COMMITS" | grep -iE "^- (fix|bugfix):" || true)
+          BREAKING=$(echo "$COMMITS" | grep -iE "^- (breaking|major):" || true)
+          DOCS=$(echo "$COMMITS" | grep -iE "^- (docs|doc):" || true)
+          CHORE=$(echo "$COMMITS" | grep -iE "^- (chore|refactor|style):" || true)
+          OTHERS=$(echo "$COMMITS" | grep -viE "^- (feat|feature|fix|bugfix|breaking|major|docs|doc|chore|refactor|style):" || true)
+          
+          # Create release notes
+          cat > release_notes.md << EOF
+          ## QuickShip ${{ steps.bump.outputs.new_version }}
+          
+          ### Release Type: ${BUMP_TYPE^^}
+          
+          EOF
+          
+          if [ -n "$BREAKING" ]; then
+            cat >> release_notes.md << 'EOF'
+          ### Breaking Changes
+          
+          EOF
+            echo "$BREAKING" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+          
+          if [ -n "$FEATURES" ]; then
+            cat >> release_notes.md << 'EOF'
+          ### New Features
+          
+          EOF
+            echo "$FEATURES" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+          
+          if [ -n "$FIXES" ]; then
+            cat >> release_notes.md << 'EOF'
+          ### Bug Fixes
+          
+          EOF
+            echo "$FIXES" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+          
+          if [ -n "$DOCS" ]; then
+            cat >> release_notes.md << 'EOF'
+          ### Documentation
+          
+          EOF
+            echo "$DOCS" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+          
+          if [ -n "$CHORE" ]; then
+            cat >> release_notes.md << 'EOF'
+          ### Maintenance
+          
+          EOF
+            echo "$CHORE" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+          
+          if [ -n "$OTHERS" ]; then
+            cat >> release_notes.md << 'EOF'
+          ### Other Changes
+          
+          EOF
+            echo "$OTHERS" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+          
+          cat >> release_notes.md << 'EOF'
+          
+          ---
+          
+          ### Quick Start
+          
+          ```bash
+          # Clone and run
+          git clone https://github.com/RedZONERROR/QuickShip.git && cd QuickShip && perl run.pl
+          
+          # Or download directly
+          curl -O https://raw.githubusercontent.com/RedZONERROR/QuickShip/main/run.pl && perl run.pl
+          ```
+          
+          ### Requirements
+          
+          - Linux VPS with Perl 5.x
+          - Port 8888 available
+          - No additional dependencies (core modules only)
+          
+          ### Features
+          
+          - Web-based file upload with progress tracking
+          - Integrated terminal with command execution
+          - Automatic deployment and self-destruct
+          - No authentication (use in trusted environments only)
+          
+          EOF
+          
+          if [ "$LATEST_TAG" != "v0.0.0" ]; then
+            echo "**Full Changelog**: https://github.com/RedZONERROR/QuickShip/compare/${LATEST_TAG}...${NEW_TAG}" >> release_notes.md
+          fi
+
+      - name: Create and push tag
+        if: steps.bump.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.bump.outputs.new_tag }}
+          git push origin ${{ steps.bump.outputs.new_tag }}
+
+      - name: Create GitHub Release
+        if: steps.bump.outputs.skip != 'true'
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.bump.outputs.new_tag }}
+          name: QuickShip ${{ steps.bump.outputs.new_version }}
+          body_path: release_notes.md
           files: |
             run.pl
-          generate_release_notes: true
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

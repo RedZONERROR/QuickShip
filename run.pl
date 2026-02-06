@@ -44,9 +44,6 @@ while (my $client = $socket->accept()) {
     if ($method eq 'GET' && $path eq '/') {
         serve_html($client);
     }
-    elsif ($method eq 'GET' && $path eq '/terminal') {
-        serve_terminal($client);
-    }
     elsif ($method eq 'POST' && $path eq '/upload') {
         handle_upload($client, $request);
     }
@@ -71,6 +68,7 @@ sub serve_html {
 <html>
 <head>
     <title>Disposable Deployment</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -89,6 +87,10 @@ sub serve_html {
             color: #333;
             margin-top: 0;
         }
+        h1 i {
+            margin-right: 10px;
+            color: #007bff;
+        }
         .warning {
             background: #fff3cd;
             border: 1px solid #ffc107;
@@ -96,6 +98,9 @@ sub serve_html {
             border-radius: 4px;
             margin: 15px 0;
             color: #856404;
+        }
+        .warning i {
+            margin-right: 8px;
         }
         input[type="file"] {
             margin: 20px 0;
@@ -163,172 +168,71 @@ sub serve_html {
             color: #333;
             z-index: 1;
         }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Disposable Deployment</h1>
-        <div class="warning">
-            <strong>⚠️ Warning:</strong> This server will self-destruct after deployment!
-        </div>
-        <form id="uploadForm" enctype="multipart/form-data">
-            <label for="file"><strong>Select executable file:</strong></label>
-            <input type="file" id="file" name="file" required>
-            <button type="submit">Deploy & Self-Destruct</button>
-        </form>
-        <div style="margin-top: 20px; text-align: center;">
-            <a href="/terminal" style="color: #007bff; text-decoration: none; font-weight: bold;">🖥️ Open Terminal</a>
-        </div>
-        <div class="progress-container" id="progressContainer">
-            <div class="progress-bar">
-                <div class="progress-text" id="progressText">0%</div>
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-        </div>
-        <div id="status"></div>
-    </div>
-    
-    <script>
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const fileInput = document.getElementById('file');
-            const statusDiv = document.getElementById('status');
-            const button = e.target.querySelector('button');
-            const progressContainer = document.getElementById('progressContainer');
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
-            
-            if (!fileInput.files[0]) {
-                statusDiv.className = 'error';
-                statusDiv.textContent = 'Please select a file';
-                statusDiv.style.display = 'block';
-                return;
-            }
-            
-            button.disabled = true;
-            button.textContent = 'Uploading...';
-            statusDiv.style.display = 'none';
-            progressContainer.style.display = 'block';
-            progressFill.style.width = '0%';
-            progressText.textContent = '0%';
-            
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-            
-            try {
-                const xhr = new XMLHttpRequest();
-                
-                // Track upload progress
-                xhr.upload.addEventListener('progress', (e) => {
-                    if (e.lengthComputable) {
-                        const percentComplete = Math.round((e.loaded / e.total) * 100);
-                        progressFill.style.width = percentComplete + '%';
-                        progressText.textContent = percentComplete + '%';
-                        
-                        if (percentComplete === 100) {
-                            button.textContent = 'Processing...';
-                        }
-                    }
-                });
-                
-                // Handle completion
-                xhr.addEventListener('load', () => {
-                    progressContainer.style.display = 'none';
-                    
-                    if (xhr.status === 200) {
-                        statusDiv.className = 'success';
-                        statusDiv.textContent = '✓ ' + xhr.responseText;
-                        statusDiv.style.display = 'block';
-                        button.textContent = 'Deployed!';
-                        
-                        setTimeout(() => {
-                            statusDiv.textContent += '\n\nServer has self-destructed. You can close this page.';
-                        }, 1000);
-                    } else {
-                        statusDiv.className = 'error';
-                        statusDiv.textContent = '✗ ' + xhr.responseText;
-                        statusDiv.style.display = 'block';
-                        button.disabled = false;
-                        button.textContent = 'Deploy & Self-Destruct';
-                    }
-                });
-                
-                // Handle errors
-                xhr.addEventListener('error', () => {
-                    progressContainer.style.display = 'none';
-                    statusDiv.className = 'error';
-                    statusDiv.textContent = '✗ Upload failed: Network error';
-                    statusDiv.style.display = 'block';
-                    button.disabled = false;
-                    button.textContent = 'Deploy & Self-Destruct';
-                });
-                
-                xhr.open('POST', '/upload');
-                xhr.send(formData);
-                
-            } catch (error) {
-                progressContainer.style.display = 'none';
-                statusDiv.className = 'error';
-                statusDiv.textContent = '✗ Upload failed: ' + error.message;
-                statusDiv.style.display = 'block';
-                button.disabled = false;
-                button.textContent = 'Deploy & Self-Destruct';
-            }
-        });
-    </script>
-</body>
-</html>
-HTML
-    
-    my $response = "HTTP/1.1 200 OK\r\n";
-    $response .= "Content-Type: text/html\r\n";
-    $response .= "Content-Length: " . length($html) . "\r\n";
-    $response .= "Connection: close\r\n\r\n";
-    $response .= $html;
-    
-    print $client $response;
-}
-
-# Serve terminal interface
-sub serve_terminal {
-    my ($client) = @_;
-    
-    my $html = <<'HTML';
-<!DOCTYPE html>
-<html>
-<head>
-    <title>QuickShip Terminal</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        .terminal-btn {
+            margin-top: 20px;
+            text-align: center;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background: #1e1e1e;
-            color: #d4d4d4;
-            height: 100vh;
+        .terminal-btn button {
+            background: #28a745;
+            width: auto;
+            padding: 10px 20px;
+        }
+        .terminal-btn button:hover {
+            background: #218838;
+        }
+        .terminal-btn i {
+            margin-right: 8px;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: #1e1e1e;
+            margin: 2% auto;
+            width: 90%;
+            height: 90%;
+            border-radius: 8px;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         }
-        .header {
+        .modal-header {
             background: #2d2d30;
-            padding: 10px 20px;
+            padding: 15px 20px;
             border-bottom: 1px solid #3e3e42;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-radius: 8px 8px 0 0;
         }
-        .header h1 {
-            font-size: 16px;
+        .modal-header h2 {
+            font-size: 18px;
             color: #cccccc;
+            margin: 0;
         }
-        .header a {
+        .modal-header i {
+            margin-right: 10px;
             color: #4ec9b0;
-            text-decoration: none;
-            font-size: 14px;
+        }
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 20px;
+        }
+        .close:hover,
+        .close:focus {
+            color: #fff;
         }
         .terminal-container {
             flex: 1;
@@ -347,6 +251,8 @@ sub serve_terminal {
             border-radius: 4px;
             font-size: 14px;
             line-height: 1.5;
+            font-family: 'Courier New', monospace;
+            color: #d4d4d4;
         }
         .output-line {
             margin: 2px 0;
@@ -370,6 +276,7 @@ sub serve_terminal {
         .prompt {
             color: #4ec9b0;
             font-weight: bold;
+            font-family: 'Courier New', monospace;
         }
         #commandInput {
             flex: 1;
@@ -385,7 +292,7 @@ sub serve_terminal {
             outline: none;
             border-color: #007acc;
         }
-        button {
+        .terminal-container button {
             background: #0e639c;
             color: white;
             border: none;
@@ -394,11 +301,12 @@ sub serve_terminal {
             border-radius: 4px;
             cursor: pointer;
             font-family: 'Courier New', monospace;
+            width: auto;
         }
-        button:hover {
+        .terminal-container button:hover {
             background: #1177bb;
         }
-        button:disabled {
+        .terminal-container button:disabled {
             background: #3e3e42;
             cursor: not-allowed;
         }
@@ -409,28 +317,62 @@ sub serve_terminal {
             margin-bottom: 10px;
             font-size: 12px;
             border-left: 3px solid #007acc;
+            color: #d4d4d4;
+        }
+        .info i {
+            margin-right: 8px;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🖥️ QuickShip Terminal</h1>
-        <a href="/">← Back to Upload</a>
-    </div>
-    <div class="terminal-container">
-        <div class="info">
-            ⚠️ Warning: All commands run with full system access. No security restrictions.
+    <div class="container">
+        <h1><i class="fas fa-rocket"></i>Disposable Deployment</h1>
+        <div class="warning">
+            <i class="fas fa-exclamation-triangle"></i><strong>Warning:</strong> This server will self-destruct after deployment!
         </div>
-        <div id="output"></div>
-        <div class="input-container">
-            <span class="prompt">$</span>
-            <input type="text" id="commandInput" placeholder="Enter command..." autofocus>
-            <button id="execBtn">Execute</button>
-            <button id="clearBtn">Clear</button>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <label for="file"><strong>Select executable file:</strong></label>
+            <input type="file" id="file" name="file" required>
+            <button type="submit"><i class="fas fa-upload"></i> Deploy & Self-Destruct</button>
+        </form>
+        <div class="terminal-btn">
+            <button id="openTerminal"><i class="fas fa-terminal"></i>Open Terminal</button>
+        </div>
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-text" id="progressText">0%</div>
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+        <div id="status"></div>
+    </div>
+    
+    <!-- Terminal Modal -->
+    <div id="terminalModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-terminal"></i>QuickShip Terminal</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="terminal-container">
+                <div class="info">
+                    <i class="fas fa-exclamation-circle"></i>Warning: All commands run with full system access. No security restrictions.
+                </div>
+                <div id="output"></div>
+                <div class="input-container">
+                    <span class="prompt">$</span>
+                    <input type="text" id="commandInput" placeholder="Enter command...">
+                    <button id="execBtn"><i class="fas fa-play"></i> Execute</button>
+                    <button id="clearBtn"><i class="fas fa-eraser"></i> Clear</button>
+                </div>
+            </div>
         </div>
     </div>
     
     <script>
+        const modal = document.getElementById('terminalModal');
+        const openTerminalBtn = document.getElementById('openTerminal');
+        const closeBtn = document.getElementsByClassName('close')[0];
         const output = document.getElementById('output');
         const commandInput = document.getElementById('commandInput');
         const execBtn = document.getElementById('execBtn');
@@ -439,6 +381,23 @@ sub serve_terminal {
         let commandHistory = [];
         let historyIndex = -1;
         
+        // Modal controls
+        openTerminalBtn.onclick = function() {
+            modal.style.display = 'block';
+            commandInput.focus();
+        }
+        
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        }
+        
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+        
+        // Terminal functions
         function addOutput(text, className = '') {
             const line = document.createElement('div');
             line.className = 'output-line ' + className;
@@ -519,9 +478,94 @@ sub serve_terminal {
             commandInput.focus();
         });
         
-        addOutput('QuickShip Terminal Ready', 'success-line');
-        addOutput('Type commands and press Enter or click Execute', 'success-line');
-        addOutput('');
+        // Upload form handling
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('file');
+            const statusDiv = document.getElementById('status');
+            const button = e.target.querySelector('button');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            if (!fileInput.files[0]) {
+                statusDiv.className = 'error';
+                statusDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please select a file';
+                statusDiv.style.display = 'block';
+                return;
+            }
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            statusDiv.style.display = 'none';
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            progressText.textContent = '0%';
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                // Track upload progress
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 100);
+                        progressFill.style.width = percentComplete + '%';
+                        progressText.textContent = percentComplete + '%';
+                        
+                        if (percentComplete === 100) {
+                            button.innerHTML = '<i class="fas fa-cog fa-spin"></i> Processing...';
+                        }
+                    }
+                });
+                
+                // Handle completion
+                xhr.addEventListener('load', () => {
+                    progressContainer.style.display = 'none';
+                    
+                    if (xhr.status === 200) {
+                        statusDiv.className = 'success';
+                        statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ' + xhr.responseText;
+                        statusDiv.style.display = 'block';
+                        button.innerHTML = '<i class="fas fa-check"></i> Deployed!';
+                        
+                        setTimeout(() => {
+                            statusDiv.innerHTML += '<br><br>Server has self-destructed. You can close this page.';
+                        }, 1000);
+                    } else {
+                        statusDiv.className = 'error';
+                        statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> ' + xhr.responseText;
+                        statusDiv.style.display = 'block';
+                        button.disabled = false;
+                        button.innerHTML = '<i class="fas fa-upload"></i> Deploy & Self-Destruct';
+                    }
+                });
+                
+                // Handle errors
+                xhr.addEventListener('error', () => {
+                    progressContainer.style.display = 'none';
+                    statusDiv.className = 'error';
+                    statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> Upload failed: Network error';
+                    statusDiv.style.display = 'block';
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-upload"></i> Deploy & Self-Destruct';
+                });
+                
+                xhr.open('POST', '/upload');
+                xhr.send(formData);
+                
+            } catch (error) {
+                progressContainer.style.display = 'none';
+                statusDiv.className = 'error';
+                statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> Upload failed: ' + error.message;
+                statusDiv.style.display = 'block';
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-upload"></i> Deploy & Self-Destruct';
+            }
+        });
     </script>
 </body>
 </html>
