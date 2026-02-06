@@ -14,18 +14,28 @@ parse_and_run_command() {
     command=$(printf '%b' "${command//%/\\x}")
     
     if [ -z "$command" ]; then
-        echo "{\"success\":false,\"output\":\"No command provided\"}"
+        echo '{"success":false,"output":"No command provided"}'
         return
     fi
     
     # Execute command and capture output
     local output
-    output=$(eval "$command" 2>&1)
-    local exit_code=$?
+    local exit_code
     
-    # Escape output for JSON
-    output=$(echo "$output" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+    # Run command in a subshell with timeout
+    output=$(timeout 30 bash -c "$command" 2>&1)
+    exit_code=$?
     
+    # Handle empty output
+    if [ -z "$output" ]; then
+        output="Command executed successfully (no output)"
+    fi
+    
+    # Escape output for JSON properly
+    # Replace backslash, quotes, newlines, tabs, carriage returns
+    output=$(echo "$output" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/\t/\\t/g' | sed 's/\r/\\r/g')
+    
+    # Build JSON response
     if [ $exit_code -eq 0 ]; then
         echo "{\"success\":true,\"output\":\"$output\",\"exit_code\":$exit_code}"
     else

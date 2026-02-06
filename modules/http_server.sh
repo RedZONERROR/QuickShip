@@ -50,7 +50,8 @@ handle_request() {
     
     # Route the request
     case "$method:$path" in
-        "GET:/")
+        "GET:/"*)
+            # Handle root and any query parameters
             serve_dashboard
             ;;
         "POST:/upload")
@@ -58,6 +59,9 @@ handle_request() {
             ;;
         "POST:/cmd")
             handle_command "$content_length"
+            ;;
+        "POST:/cleanup")
+            handle_cleanup
             ;;
         "POST:/nuke")
             handle_nuke
@@ -117,6 +121,13 @@ handle_command() {
     
     local result
     result=$(parse_and_run_command "$content_length")
+    
+    send_response "200 OK" "application/json" "$result"
+}
+
+handle_cleanup() {
+    local result
+    result=$(execute_cleanup)
     
     send_response "200 OK" "application/json" "$result"
 }

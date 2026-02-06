@@ -16,6 +16,7 @@ source ./modules/req_parser.sh
 source ./modules/file_handler.sh
 source ./modules/cmd_runner.sh
 source ./modules/service_mgr.sh
+source ./modules/cleanup.sh
 source ./modules/nuke.sh
 
 # Create necessary directories
