@@ -25,7 +25,7 @@ execute_cleanup() {
     # Remove binaries installed by QuickShip
     if [ -d "$BIN_DIR" ]; then
         # Only remove files that match our service pattern
-        for service_file in "$SERVICE_DIR/${SERVICE_PREFIX}-"*.service 2>/dev/null; do
+        for service_file in "$SERVICE_DIR/${SERVICE_PREFIX}-"*.service; do
             if [ -f "$service_file" ]; then
                 binary_name=$(basename "$service_file" .service | sed "s/^${SERVICE_PREFIX}-//")
                 if [ -f "$BIN_DIR/$binary_name" ]; then
