@@ -7,7 +7,8 @@ use Cwd 'abs_path';
 
 # Configuration
 my $PORT = 8888;
-my $UPLOAD_FILE = 'app_executable';
+my $UPLOAD_DIR = 'uploads';
+my $current_filename = '';
 
 # Get script location for self-destruct
 my $SCRIPT_PATH = abs_path($0);
@@ -16,7 +17,11 @@ my $SCRIPT_DIR = dirname($SCRIPT_PATH);
 print "Starting Disposable Deployment Server on port $PORT...\n";
 print "Access at: http://YOUR_VPS_IP:$PORT\n";
 print "Script location: $SCRIPT_PATH\n";
-print "Working directory: $SCRIPT_DIR\n\n";
+print "Working directory: $SCRIPT_DIR\n";
+print "Upload directory: $UPLOAD_DIR\n\n";
+
+# Create upload directory if it doesn't exist
+mkdir $UPLOAD_DIR unless -d $UPLOAD_DIR;
 
 # Create socket
 my $socket = IO::Socket::INET->new(
@@ -346,19 +351,27 @@ sub serve_html {
     <div class="container">
         <h1><i class="fas fa-rocket"></i>Disposable Deployment</h1>
         <div class="warning">
-            <i class="fas fa-exclamation-triangle"></i><strong>Warning:</strong> Checking "Execute" will run the file and self-destruct the server!
+            <i class="fas fa-exclamation-triangle"></i><strong>Warning:</strong> Service installation will self-destruct the server. Use self-destruct button for manual control.
         </div>
         <form id="uploadForm" enctype="multipart/form-data">
             <label for="file"><strong>Select executable file:</strong></label>
             <input type="file" id="file" name="file" required>
             
             <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 4px;">
-                <label style="display: flex; align-items: center; cursor: pointer;">
+                <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 10px;">
                     <input type="checkbox" id="executeCheckbox" name="execute" checked style="margin-right: 10px; width: 18px; height: 18px; cursor: pointer;">
-                    <span><strong>Execute as application and self-destruct</strong></span>
+                    <span><strong>Execute as application (runs in background)</strong></span>
                 </label>
-                <small style="display: block; margin-top: 5px; color: #6c757d; margin-left: 28px;">
-                    Uncheck to upload file without execution (server stays running)
+                <small style="display: block; margin-bottom: 10px; color: #6c757d; margin-left: 28px;">
+                    Uncheck to upload file without execution
+                </small>
+                
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="serviceCheckbox" name="service" style="margin-right: 10px; width: 18px; height: 18px; cursor: pointer;">
+                    <span><strong>Install as systemd service (auto self-destruct)</strong></span>
+                </label>
+                <small style="display: block; color: #6c757d; margin-left: 28px;">
+                    Persistent service + auto-start on reboot + self-destruct server
                 </small>
             </div>
             
@@ -518,9 +531,14 @@ sub serve_html {
         // Self-destruct button handler
         selfDestructBtn.addEventListener('click', function() {
             const shouldExecute = executeCheckbox.checked;
-            const confirmMsg = shouldExecute 
-                ? 'Are you sure you want to execute the uploaded file and self-destruct the server? This will run app_executable, delete run.pl and stop the server.'
-                : 'Are you sure you want to self-destruct the server? This will delete run.pl and stop the server immediately.';
+            const installService = document.getElementById('serviceCheckbox').checked;
+            
+            let confirmMsg = 'Are you sure you want to self-destruct the server?';
+            if (shouldExecute && installService) {
+                confirmMsg = 'Install uploaded file as systemd service and self-destruct? The service will run persistently and auto-start on reboot.';
+            } else if (shouldExecute) {
+                confirmMsg = 'Execute the uploaded file in background and self-destruct the server?';
+            }
             
             if (confirm(confirmMsg)) {
                 this.disabled = true;
@@ -531,19 +549,19 @@ sub serve_html {
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                     },
-                    body: 'execute=' + (shouldExecute ? '1' : '0')
+                    body: 'execute=' + (shouldExecute ? '1' : '0') + '&service=' + (installService ? '1' : '0')
                 })
                 .then(response => response.text())
                 .then(result => {
                     alert(result);
                     const msg = shouldExecute 
-                        ? '<p>The uploaded file has been executed, and run.pl has been deleted.</p>'
+                        ? '<p>The uploaded file is running and run.pl has been deleted.</p>'
                         : '<p>The server has been stopped and run.pl has been deleted.</p>';
                     document.body.innerHTML = '<div style="text-align: center; padding: 50px; font-family: Arial;"><h1><i class="fas fa-check-circle" style="color: #28a745;"></i></h1><h2>Server Self-Destructed</h2>' + msg + '</div>';
                 })
                 .catch(error => {
                     const msg = shouldExecute 
-                        ? 'Self-destruct initiated. File executed and server is shutting down.'
+                        ? 'Self-destruct initiated. File running and server is shutting down.'
                         : 'Self-destruct initiated. Server is shutting down.';
                     alert(msg);
                     document.body.innerHTML = '<div style="text-align: center; padding: 50px; font-family: Arial;"><h1><i class="fas fa-check-circle" style="color: #28a745;"></i></h1><h2>Server Self-Destructed</h2></div>';
@@ -554,11 +572,14 @@ sub serve_html {
         // Update button text based on checkbox
         executeCheckbox.addEventListener('change', function() {
             if (this.checked) {
-                btnText.textContent = 'Deploy & Self-Destruct';
+                btnText.textContent = 'Upload & Execute';
             } else {
                 btnText.textContent = 'Upload File';
             }
         });
+        
+        // Update button text on page load
+        btnText.textContent = 'Upload & Execute';
         
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -588,6 +609,7 @@ sub serve_html {
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
             formData.append('execute', shouldExecute ? '1' : '0');
+            formData.append('service', document.getElementById('serviceCheckbox').checked ? '1' : '0');
             
             try {
                 const xhr = new XMLHttpRequest();
@@ -613,12 +635,16 @@ sub serve_html {
                         statusDiv.className = 'success';
                         statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ' + xhr.responseText;
                         statusDiv.style.display = 'block';
-                        button.innerHTML = '<i class="fas fa-check"></i> ' + (shouldExecute ? 'Deployed!' : 'Uploaded!');
                         
-                        if (shouldExecute) {
+                        if (shouldExecute && document.getElementById('serviceCheckbox').checked) {
+                            button.innerHTML = '<i class="fas fa-check"></i> Service Installed!';
                             setTimeout(() => {
                                 statusDiv.innerHTML += '<br><br>Server has self-destructed. You can close this page.';
                             }, 1000);
+                        } else if (shouldExecute) {
+                            button.innerHTML = '<i class="fas fa-check"></i> Uploaded & Executing!';
+                        } else {
+                            button.innerHTML = '<i class="fas fa-check"></i> Uploaded!';
                         }
                     } else {
                         statusDiv.className = 'error';
@@ -712,20 +738,26 @@ sub handle_self_destruct {
     my ($content_length) = $request =~ /Content-Length:\s*(\d+)/i;
     
     my $should_execute = 0;
+    my $install_service = 0;
     
     # Read body if present
     if ($content_length && $content_length > 0) {
         my $body = '';
         read($client, $body, $content_length);
         
-        # Parse execute parameter
+        # Parse parameters
         if ($body =~ /execute=1/) {
             $should_execute = 1;
+        }
+        if ($body =~ /service=1/) {
+            $install_service = 1;
         }
     }
     
     my $msg = $should_execute 
-        ? "Executing uploaded file and self-destructing. Server shutting down..."
+        ? ($install_service 
+            ? "Installing as service and self-destructing. Server shutting down..."
+            : "Executing in background and self-destructing. Server shutting down...")
         : "Self-destruct initiated. Server shutting down...";
     
     my $response = "HTTP/1.1 200 OK\r\n";
@@ -741,21 +773,28 @@ sub handle_self_destruct {
     print "\n=== SELF-DESTRUCT INITIATED ===\n";
     
     # Execute uploaded file if requested
-    if ($should_execute && -f $UPLOAD_FILE) {
-        print "Making $UPLOAD_FILE executable...\n";
-        chmod 0755, $UPLOAD_FILE;
+    if ($should_execute && $current_filename && -f $current_filename) {
+        chmod 0755, $current_filename;
         
-        print "Executing $UPLOAD_FILE in background...\n";
-        my $pid = fork();
-        if ($pid == 0) {
-            # Child process - execute the app
-            close(STDIN);
-            close(STDOUT);
-            close(STDERR);
-            exec("./$UPLOAD_FILE") or die "Cannot execute: $!";
+        if ($install_service) {
+            # Install as systemd service
+            my $filename = $current_filename;
+            $filename =~ s/.*\///;  # Get basename
+            install_systemd_service($current_filename, $filename);
+        } else {
+            # Run in background
+            print "Starting $current_filename in background...\n";
+            my $pid = fork();
+            if ($pid == 0) {
+                # Child process - execute the app
+                close(STDIN);
+                close(STDOUT);
+                close(STDERR);
+                exec("./$current_filename") or die "Cannot execute: $!";
+            }
+            print "Application started with PID: $pid\n";
+            sleep 1;
         }
-        print "Application started with PID: $pid\n";
-        sleep 1; # Give time for app to start
     }
     
     print "Closing server socket...\n";
@@ -809,7 +848,9 @@ sub handle_upload {
     my @parts = split(/--\Q$boundary\E/, $body);
     
     my $file_data;
+    my $filename = 'uploaded_file';
     my $should_execute = 0;
+    my $install_service = 0;
     
     foreach my $part (@parts) {
         next if $part =~ /^--/ || $part =~ /^\s*$/;
@@ -820,6 +861,12 @@ sub handle_upload {
             
             # Check if this is the file field
             if ($headers =~ /name="file"/) {
+                # Extract filename from Content-Disposition header
+                if ($headers =~ /filename="([^"]+)"/) {
+                    $filename = $1;
+                    # Remove path if present (security)
+                    $filename =~ s/.*[\/\\]//;
+                }
                 # Remove trailing boundary markers
                 $content =~ s/\r?\n--$//;
                 $file_data = $content;
@@ -829,6 +876,11 @@ sub handle_upload {
                 $content =~ s/\r?\n--$//;
                 $should_execute = ($content =~ /1/);
             }
+            # Check if this is the service field
+            elsif ($headers =~ /name="service"/) {
+                $content =~ s/\r?\n--$//;
+                $install_service = ($content =~ /1/);
+            }
         }
     }
     
@@ -837,8 +889,9 @@ sub handle_upload {
         return;
     }
     
-    # Save file
-    open(my $fh, '>', $UPLOAD_FILE) or do {
+    # Save file with original filename in uploads directory
+    my $upload_path = "$UPLOAD_DIR/$filename";
+    open(my $fh, '>', $upload_path) or do {
         send_error($client, "Cannot save file: $!");
         return;
     };
@@ -846,13 +899,18 @@ sub handle_upload {
     print $fh $file_data;
     close($fh);
     
+    # Store filename globally for self-destruct
+    $current_filename = $upload_path;
+    
     # Make executable if needed
-    chmod 0755, $UPLOAD_FILE if $should_execute;
+    chmod 0755, $upload_path if $should_execute;
     
     # Send success response
     my $msg = $should_execute 
-        ? "Deployment successful! Executing and self-destructing..." 
-        : "File uploaded successfully! Server is still running.";
+        ? ($install_service 
+            ? "File '$filename' uploaded! Installing as service and self-destructing..." 
+            : "File '$filename' uploaded and executing in background! Server still running.")
+        : "File '$filename' uploaded successfully! Server is still running.";
     
     my $response = "HTTP/1.1 200 OK\r\n";
     $response .= "Content-Type: text/plain\r\n";
@@ -865,44 +923,127 @@ sub handle_upload {
     
     # Only execute and self-destruct if checkbox was checked
     if ($should_execute) {
-        # Execute the uploaded file in background
-        print "\nExecuting $UPLOAD_FILE...\n";
+        # Make executable
+        chmod 0755, $upload_path;
         
-        # Fork and execute
-        my $pid = fork();
-        if ($pid == 0) {
-            # Child process - execute the app
-            close(STDIN);
-            close(STDOUT);
-            close(STDERR);
-            exec("./$UPLOAD_FILE") or die "Cannot execute: $!";
+        if ($install_service) {
+            # Install as systemd service
+            install_systemd_service($upload_path, $filename);
+            
+            # Self-destruct after service installation
+            print "\nService installed. Initiating self-destruct sequence...\n";
+            
+            # Close server socket
+            close($socket);
+            
+            # Self-destruct
+            print "Deleting $SCRIPT_PATH...\n";
+            unlink($SCRIPT_PATH) or warn "Cannot delete script: $!";
+            
+            # Try to remove directory if empty
+            if ($SCRIPT_DIR ne '/' && $SCRIPT_DIR ne $ENV{HOME}) {
+                print "Attempting to remove directory $SCRIPT_DIR...\n";
+                rmdir($SCRIPT_DIR); # Only works if empty
+            }
+            
+            print "Self-destruct complete. Goodbye!\n";
+            exit(0);
+        } else {
+            # Execute the uploaded file in background
+            print "\nExecuting $upload_path in background...\n";
+            
+            # Fork to run in background
+            my $pid = fork();
+            if ($pid == 0) {
+                # Child process - execute the app
+                close(STDIN);
+                close(STDOUT);
+                close(STDERR);
+                exec("./$upload_path") or die "Cannot execute: $!";
+            }
+            
+            # Parent - confirm execution
+            print "Application started with PID: $pid\n";
+            print "Running in background...\n";
+            print "Server continues running. Use terminal or self-destruct button when done.\n";
         }
-        
-        # Parent process - self-destruct
-        print "Application started with PID: $pid\n";
-        print "Initiating self-destruct sequence...\n";
-        
-        sleep 1; # Give time for response to be sent
-        
-        # Close server socket
-        close($socket);
-        
-        # Self-destruct
-        print "Deleting $SCRIPT_PATH...\n";
-        unlink($SCRIPT_PATH) or warn "Cannot delete script: $!";
-        
-        # Try to remove directory if empty
-        if ($SCRIPT_DIR ne '/' && $SCRIPT_DIR ne $ENV{HOME}) {
-            print "Attempting to remove directory $SCRIPT_DIR...\n";
-            rmdir($SCRIPT_DIR); # Only works if empty
-        }
-        
-        print "Self-destruct complete. Goodbye!\n";
-        exit(0);
     } else {
         # Just uploaded, server continues running
-        print "\nFile uploaded as $UPLOAD_FILE (not executed)\n";
+        print "\nFile uploaded as $upload_path (not executed)\n";
     }
+}
+
+# Install systemd service
+sub install_systemd_service {
+    my ($exec_path, $filename) = @_;
+    
+    # Get absolute path
+    my $abs_path = Cwd::abs_path($exec_path);
+    my $service_name = $filename;
+    $service_name =~ s/[^a-zA-Z0-9_-]/_/g;  # Sanitize service name
+    $service_name = "quickship-$service_name";
+    
+    print "\nInstalling systemd service: $service_name\n";
+    print "=" x 50 . "\n";
+    
+    # Create systemd service file
+    my $service_content = <<EOF;
+[Unit]
+Description=QuickShip Deployed Application - $filename
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$abs_path
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    my $service_file = "/etc/systemd/system/$service_name.service";
+    
+    # Write service file (requires sudo)
+    open(my $fh, '>', "/tmp/$service_name.service") or die "Cannot create temp service file: $!";
+    print $fh $service_content;
+    close($fh);
+    
+    # Move to systemd directory and enable
+    print "Installing service file...\n";
+    system("sudo mv /tmp/$service_name.service $service_file");
+    system("sudo chmod 644 $service_file");
+    
+    print "Reloading systemd...\n";
+    system("sudo systemctl daemon-reload");
+    
+    print "Enabling service...\n";
+    system("sudo systemctl enable $service_name");
+    
+    print "Starting service...\n";
+    system("sudo systemctl start $service_name");
+    
+    sleep 2;
+    
+    # Check status
+    my $status = `sudo systemctl is-active $service_name`;
+    chomp($status);
+    
+    if ($status eq 'active') {
+        print "\n✓ Service installed and running successfully!\n";
+        print "Service name: $service_name\n";
+        print "Commands:\n";
+        print "  - Check status: sudo systemctl status $service_name\n";
+        print "  - Stop service: sudo systemctl stop $service_name\n";
+        print "  - View logs: sudo journalctl -u $service_name -f\n";
+    } else {
+        print "\n✗ Service installation completed but not running\n";
+        print "Check logs: sudo journalctl -u $service_name\n";
+    }
+    
+    print "=" x 50 . "\n";
 }
 
 # Send 404 response
