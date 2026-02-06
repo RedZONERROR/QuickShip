@@ -904,19 +904,6 @@ sub handle_upload {
         print "\nFile uploaded as $UPLOAD_FILE (not executed)\n";
     }
 }
-    # Self-destruct
-    print "Deleting $SCRIPT_PATH...\n";
-    unlink($SCRIPT_PATH) or warn "Cannot delete script: $!";
-    
-    # Try to remove directory if empty
-    if ($SCRIPT_DIR ne '/' && $SCRIPT_DIR ne $ENV{HOME}) {
-        print "Attempting to remove directory $SCRIPT_DIR...\n";
-        rmdir($SCRIPT_DIR); # Only works if empty
-    }
-    
-    print "Self-destruct complete. Goodbye!\n";
-    exit(0);
-}
 
 # Send 404 response
 sub send_404 {
