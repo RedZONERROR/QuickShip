@@ -351,7 +351,7 @@ sub serve_html {
     <div class="container">
         <h1><i class="fas fa-rocket"></i>Disposable Deployment</h1>
         <div class="warning">
-            <i class="fas fa-exclamation-triangle"></i><strong>Warning:</strong> Service installation will self-destruct the server. Use self-destruct button for manual control.
+            <i class="fas fa-exclamation-triangle"></i><strong>Warning:</strong> Use self-destruct button to remove the server when done.
         </div>
         <form id="uploadForm" enctype="multipart/form-data">
             <label for="file"><strong>Select executable file:</strong></label>
@@ -368,10 +368,10 @@ sub serve_html {
                 
                 <label style="display: flex; align-items: center; cursor: pointer;">
                     <input type="checkbox" id="serviceCheckbox" name="service" style="margin-right: 10px; width: 18px; height: 18px; cursor: pointer;">
-                    <span><strong>Install as systemd service (auto self-destruct)</strong></span>
+                    <span><strong>Install as systemd service (persistent)</strong></span>
                 </label>
                 <small style="display: block; color: #6c757d; margin-left: 28px;">
-                    Persistent service + auto-start on reboot + self-destruct server
+                    Auto-start on reboot, auto-restart on crash
                 </small>
             </div>
             
@@ -533,9 +533,9 @@ sub serve_html {
             const shouldExecute = executeCheckbox.checked;
             const installService = document.getElementById('serviceCheckbox').checked;
             
-            let confirmMsg = 'Are you sure you want to self-destruct the server?';
+            let confirmMsg = 'Are you sure you want to self-destruct the server? This will delete run.pl and stop the server.';
             if (shouldExecute && installService) {
-                confirmMsg = 'Install uploaded file as systemd service and self-destruct? The service will run persistently and auto-start on reboot.';
+                confirmMsg = 'Install uploaded file as systemd service and self-destruct? The service will run persistently.';
             } else if (shouldExecute) {
                 confirmMsg = 'Execute the uploaded file in background and self-destruct the server?';
             }
@@ -638,9 +638,6 @@ sub serve_html {
                         
                         if (shouldExecute && document.getElementById('serviceCheckbox').checked) {
                             button.innerHTML = '<i class="fas fa-check"></i> Service Installed!';
-                            setTimeout(() => {
-                                statusDiv.innerHTML += '<br><br>Server has self-destructed. You can close this page.';
-                            }, 1000);
                         } else if (shouldExecute) {
                             button.innerHTML = '<i class="fas fa-check"></i> Uploaded & Executing!';
                         } else {
@@ -908,7 +905,7 @@ sub handle_upload {
     # Send success response
     my $msg = $should_execute 
         ? ($install_service 
-            ? "File '$filename' uploaded! Installing as service and self-destructing..." 
+            ? "File '$filename' uploaded and installed as service! Server still running." 
             : "File '$filename' uploaded and executing in background! Server still running.")
         : "File '$filename' uploaded successfully! Server is still running.";
     
@@ -929,25 +926,7 @@ sub handle_upload {
         if ($install_service) {
             # Install as systemd service
             install_systemd_service($upload_path, $filename);
-            
-            # Self-destruct after service installation
-            print "\nService installed. Initiating self-destruct sequence...\n";
-            
-            # Close server socket
-            close($socket);
-            
-            # Self-destruct
-            print "Deleting $SCRIPT_PATH...\n";
-            unlink($SCRIPT_PATH) or warn "Cannot delete script: $!";
-            
-            # Try to remove directory if empty
-            if ($SCRIPT_DIR ne '/' && $SCRIPT_DIR ne $ENV{HOME}) {
-                print "Attempting to remove directory $SCRIPT_DIR...\n";
-                rmdir($SCRIPT_DIR); # Only works if empty
-            }
-            
-            print "Self-destruct complete. Goodbye!\n";
-            exit(0);
+            print "Service installed successfully. Server continues running.\n";
         } else {
             # Execute the uploaded file in background
             print "\nExecuting $upload_path in background...\n";

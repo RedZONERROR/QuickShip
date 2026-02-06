@@ -59,10 +59,10 @@ wget https://raw.githubusercontent.com/RedZONERROR/QuickShip/main/run.pl && sudo
 4. **Three deployment modes:**
    - **Upload Only**: Just upload files, server keeps running
    - **Upload & Execute**: Run executable in background, server keeps running
-   - **Install as Service**: Install as systemd service (persistent, auto-restart on reboot, auto self-destruct)
+   - **Install as Service**: Install as systemd service (persistent, auto-restart on reboot), server keeps running
 5. Integrated terminal for command execution
-6. Manual self-destruct button
-7. **Self-destructs only when:** service is installed OR self-destruct button is clicked
+6. Manual self-destruct button (only way to destroy the server)
+7. **Self-destructs only when:** self-destruct button is clicked
 
 ## Usage
 
@@ -105,7 +105,7 @@ http://YOUR_VPS_IP:8888
 - Upload your executable
 - Installs as systemd service
 - Auto-starts on VPS reboot
-- **Server self-destructs automatically**
+- **Server continues running** - use self-destruct button when done
 
 ### 4. Additional Features
 
@@ -127,9 +127,9 @@ http://YOUR_VPS_IP:8888
 - 🔄 **Three deployment modes:**
   - Upload only (server keeps running)
   - Upload & execute in background (server keeps running)
-  - Install as persistent systemd service (auto self-destruct)
+  - Install as persistent systemd service (server keeps running)
 - 🖥️ **Integrated terminal** with command execution (modal interface)
-- 💣 **Manual self-destruct** button with optional execution
+- 💣 **Manual self-destruct** button (only way to remove server)
 - 🎨 **Modern UI** with Font Awesome icons
 - 🔒 **Core modules only** - no CPAN dependencies required
 - ⚡ **Lightweight** - single Perl script
