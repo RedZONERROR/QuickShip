@@ -1,183 +1,128 @@
-# QuickShip Deployment Toolkit
+# QuickShip 🚀
 
-[![Test QuickShip](https://github.com/RedZONERROR/QuickShip/actions/workflows/test.yml/badge.svg)](https://github.com/RedZONERROR/QuickShip/actions/workflows/test.yml)
-[![Auto Release](https://github.com/RedZONERROR/QuickShip/actions/workflows/auto-release.yml/badge.svg)](https://github.com/RedZONERROR/QuickShip/actions/workflows/auto-release.yml)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/RedZONERROR/QuickShip)](https://github.com/RedZONERROR/QuickShip/releases/latest)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Bash](https://img.shields.io/badge/bash-5.0+-green.svg)](https://www.gnu.org/software/bash/)
-[![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)](https://www.linux.org/)
+[![Latest Release](https://img.shields.io/github/v/release/RedZONERROR/QuickShip?color=blue)](https://github.com/RedZONERROR/QuickShip/releases/latest)
+[![Tests](https://github.com/RedZONERROR/QuickShip/actions/workflows/test.yml/badge.svg)](https://github.com/RedZONERROR/QuickShip/actions/workflows/test.yml)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Perl](https://img.shields.io/badge/perl-5.x-purple.svg)](https://www.perl.org/)
+[![Platform](https://img.shields.io/badge/platform-linux-lightgrey.svg)](https://github.com/RedZONERROR/QuickShip)
+[![GitHub Stars](https://img.shields.io/github/stars/RedZONERROR/QuickShip?style=social)](https://github.com/RedZONERROR/QuickShip/stargazers)
 
-A modular, zero-dependency deployment system using only bash and netcat. Deploy services to your VPS with a web interface - no Python, Node.js, PHP, or Docker required.
+A single-use Perl script for deploying executables to a Linux VPS without FTP or SSH keys. Upload, deploy, and self-destruct in seconds.
 
-## Features
+## Quick Start
 
-- **File Upload**: Upload any file to your VPS
-- **Service Deployment**: Automatically install binaries and create systemd services
-- **Web Terminal**: Execute shell commands directly from the browser
-- **Self-Destruct**: Complete cleanup with the nuke function
+Paste this into your VPS terminal:
 
-## Requirements
-
-- Linux VPS with bash
-- netcat (nc)
-- systemd (for service management)
-- sudo access (for service installation)
-
-## Installation
-
-1. Upload QuickShip to your VPS:
 ```bash
-# Clone or upload the entire directory
-cd /opt
-git clone https://github.com/RedZONERROR/QuickShip.git quickship
-cd quickship
+git clone https://github.com/RedZONERROR/QuickShip.git && cd QuickShip && perl run.pl
 ```
 
-2. Make scripts executable:
+Or download the latest release directly:
+
 ```bash
-chmod +x main.sh
-chmod +x modules/*.sh
+curl -O https://raw.githubusercontent.com/RedZONERROR/QuickShip/main/run.pl && perl run.pl
 ```
 
-3. Start the server:
+Or using wget:
+
 ```bash
-./main.sh
+wget https://raw.githubusercontent.com/RedZONERROR/QuickShip/main/run.pl && perl run.pl
 ```
+
+## What It Does
+
+1. Starts an HTTP server on port 8888
+2. Serves a web interface for file upload
+3. Accepts your Node.js executable
+4. Makes it executable (`chmod +x`)
+5. Runs it in the background
+6. **Self-destructs** (deletes itself and exits)
 
 ## Usage
 
-### Starting the Server
+1. Run the script on your VPS:
+   ```bash
+   perl run.pl
+   ```
 
-```bash
-./main.sh
-```
+2. Open your browser to:
+   ```
+   http://YOUR_VPS_IP:8888
+   ```
 
-Default: http://0.0.0.0:8080
+3. Upload your Node.js executable file
 
-Custom host/port:
-```bash
-QUICKSHIP_HOST=192.168.1.100 QUICKSHIP_PORT=9000 ./main.sh
-```
+4. Click "Deploy & Self-Destruct"
 
-### Accessing the Dashboard
+5. The script will:
+   - Save your file as `app_executable`
+   - Execute it in the background
+   - Delete itself
+   - Exit
 
-Open your browser and navigate to:
-```
-http://YOUR_VPS_IP:8080
-```
+## Requirements
 
-### Uploading Files
+- Linux VPS
+- Perl (pre-installed on most Linux systems)
+- Port 8888 open (or modify the `$PORT` variable in the script)
 
-1. **Regular File Upload**: Select a file and click Upload (stores in ./uploads/)
-2. **Service Deployment**: Check "Run as Service" to:
-   - Install binary to /usr/local/bin
-   - Create systemd service
-   - Auto-start with Restart=always
+## Security Notes
 
-### Web Terminal
+- This is designed for **one-time use** in trusted environments
+- No authentication - anyone who can access the port can upload
+- The script self-destructs after deployment
+- Use only for temporary/disposable deployments
+- Consider firewall rules to restrict access to port 8888
 
-Execute any shell command directly from the browser. Output is displayed in real-time.
+## Customization
 
-### Nuke Everything
+Edit these variables in `run.pl`:
 
-The nuclear option:
-- Stops all QuickShip services
-- Removes all installed binaries
-- Deletes all service files
-- Removes the entire QuickShip directory
-
-## Architecture
-
-```
-quickship/
-├── main.sh                 # Entry point
-├── config.sh               # Configuration
-├── modules/
-│   ├── http_server.sh      # Netcat-based HTTP server
-│   ├── req_parser.sh       # Multipart form parser
-│   ├── file_handler.sh     # File storage/installation
-│   ├── cmd_runner.sh       # Command execution
-│   ├── service_mgr.sh      # Systemd service manager
-│   └── nuke.sh             # Self-destruct
-└── views/
-    └── dashboard.html      # Web interface
-```
-
-## Security Warning
-
-⚠️ **NO AUTHENTICATION** - This system has zero security by design. Only use on:
-- Private networks
-- Trusted environments
-- Behind a firewall
-- For temporary deployments
-
-## How It Works
-
-1. **HTTP Server**: Pure bash + netcat loop listening on port 8080
-2. **Request Routing**: Parses HTTP headers and routes to appropriate handlers
-3. **File Upload**: Parses multipart/form-data in pure bash
-4. **Service Creation**: Generates systemd unit files and manages lifecycle
-5. **Command Execution**: Runs shell commands and returns JSON responses
+- `$PORT` - Change the server port (default: 8888)
+- `$UPLOAD_FILE` - Change the output filename (default: app_executable)
 
 ## Troubleshooting
 
 **Port already in use:**
 ```bash
-# Kill existing process
-sudo lsof -ti:8080 | xargs kill -9
+# Check what's using port 8888
+sudo netstat -tlnp | grep 8888
 
-# Or use different port
-QUICKSHIP_PORT=9000 ./main.sh
+# Or change the port in the script
 ```
 
 **Permission denied:**
 ```bash
-# Ensure scripts are executable
-chmod +x main.sh modules/*.sh
-
-# Run with sudo if needed for service management
-sudo ./main.sh
+chmod +x run.pl
 ```
 
-**Service creation fails:**
+**Firewall blocking:**
 ```bash
-# Ensure systemd is available
-systemctl --version
+# Allow port 8888 (Ubuntu/Debian)
+sudo ufw allow 8888
 
-# Check sudo access
-sudo -v
+# Or (CentOS/RHEL)
+sudo firewall-cmd --add-port=8888/tcp
 ```
+
+## Changelog
+
+### (Initial Release)
+- ✨ HTTP server with web interface
+- 📤 File upload via browser
+- 🔧 Automatic chmod +x and execution
+- 💥 Self-destruct after deployment
+- 🎨 Clean, modern UI
+- 🔒 Core Perl modules only (no CPAN dependencies)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-Use at your own risk. No warranty provided.
+MIT License - Use at your own risk
 
-## Release Process
+---
 
-Releases are **fully automated** using semantic versioning based on commit messages. Version numbers are managed through **git tags only** - no VERSION file needed.
-
-### Commit Message Convention
-
-- `feat:` or `feature:` - Bumps **minor** version (e.g., 1.0.0 → 1.1.0)
-- `fix:` or `bugfix:` - Bumps **patch** version (e.g., 1.0.0 → 1.0.1)
-- `breaking:` or `major:` - Bumps **major** version (e.g., 1.0.0 → 2.0.0)
-- Other commits - Bumps **patch** version by default
-
-### Example Commits
-
-```bash
-git commit -m "feat: add file compression support"        # 1.0.0 → 1.1.0
-git commit -m "fix: resolve upload timeout issue"        # 1.0.0 → 1.0.1
-git commit -m "breaking: change API endpoint structure"  # 1.0.0 → 2.0.0
-```
-
-### Automated Workflow
-
-When you push to `main`:
-1. ✅ All tests run automatically
-2. 🔢 Version is calculated from the latest git tag and commit messages
-3. 📝 Release notes are generated with categorized changes
-4. 🏷️ New git tag is created and pushed
-5. 🚀 GitHub release is published with installation instructions
-
-**Single source of truth:** Git tags are the only version reference - clean and simple!
+Made with ❤️ for quick and dirty deployments
