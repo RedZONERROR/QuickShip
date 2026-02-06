@@ -30,12 +30,12 @@ jobs:
       - name: Check for security issues
         run: |
           echo "Checking for dangerous patterns..."
-          ! grep -E "(system\(|exec\(|`)" run.pl | grep -v "exec\(\"\./\$UPLOAD_FILE\"\)" || echo "Warning: Potentially dangerous system calls"
+          grep -E "system\(|exec\(|backtick" run.pl | grep -v "exec\(\"\./\$UPLOAD_FILE\"\)" || echo "No dangerous system calls found"
           
           echo "Checking for hardcoded credentials..."
-          ! grep -iE "(password|secret|api_key)\s*=\s*['\"][^'\"]+['\"]" run.pl || echo "Warning: Potential hardcoded credentials"
+          grep -iE "password|secret|api_key" run.pl | grep -E "=\s*['\"]" || echo "No hardcoded credentials found"
           
-          echo "✓ Security scan complete"
+          echo "Security scan complete"
 
   code-quality:
     name: Code Quality

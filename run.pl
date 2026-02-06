@@ -44,8 +44,14 @@ while (my $client = $socket->accept()) {
     if ($method eq 'GET' && $path eq '/') {
         serve_html($client);
     }
+    elsif ($method eq 'GET' && $path eq '/terminal') {
+        serve_terminal($client);
+    }
     elsif ($method eq 'POST' && $path eq '/upload') {
         handle_upload($client, $request);
+    }
+    elsif ($method eq 'POST' && $path eq '/exec') {
+        handle_command($client, $request);
     }
     else {
         send_404($client);
@@ -170,6 +176,9 @@ sub serve_html {
             <input type="file" id="file" name="file" required>
             <button type="submit">Deploy & Self-Destruct</button>
         </form>
+        <div style="margin-top: 20px; text-align: center;">
+            <a href="/terminal" style="color: #007bff; text-decoration: none; font-weight: bold;">🖥️ Open Terminal</a>
+        </div>
         <div class="progress-container" id="progressContainer">
             <div class="progress-bar">
                 <div class="progress-text" id="progressText">0%</div>
@@ -277,6 +286,291 @@ HTML
     $response .= "Content-Length: " . length($html) . "\r\n";
     $response .= "Connection: close\r\n\r\n";
     $response .= $html;
+    
+    print $client $response;
+}
+
+# Serve terminal interface
+sub serve_terminal {
+    my ($client) = @_;
+    
+    my $html = <<'HTML';
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuickShip Terminal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: #2d2d30;
+            padding: 10px 20px;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 16px;
+            color: #cccccc;
+        }
+        .header a {
+            color: #4ec9b0;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .terminal-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+        }
+        #output {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .output-line {
+            margin: 2px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .command-line {
+            color: #4ec9b0;
+        }
+        .error-line {
+            color: #f48771;
+        }
+        .success-line {
+            color: #89d185;
+        }
+        .input-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .prompt {
+            color: #4ec9b0;
+            font-weight: bold;
+        }
+        #commandInput {
+            flex: 1;
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+        #commandInput:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        button:disabled {
+            background: #3e3e42;
+            cursor: not-allowed;
+        }
+        .info {
+            background: #1e3a5f;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            border-left: 3px solid #007acc;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🖥️ QuickShip Terminal</h1>
+        <a href="/">← Back to Upload</a>
+    </div>
+    <div class="terminal-container">
+        <div class="info">
+            ⚠️ Warning: All commands run with full system access. No security restrictions.
+        </div>
+        <div id="output"></div>
+        <div class="input-container">
+            <span class="prompt">$</span>
+            <input type="text" id="commandInput" placeholder="Enter command..." autofocus>
+            <button id="execBtn">Execute</button>
+            <button id="clearBtn">Clear</button>
+        </div>
+    </div>
+    
+    <script>
+        const output = document.getElementById('output');
+        const commandInput = document.getElementById('commandInput');
+        const execBtn = document.getElementById('execBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        let commandHistory = [];
+        let historyIndex = -1;
+        
+        function addOutput(text, className = '') {
+            const line = document.createElement('div');
+            line.className = 'output-line ' + className;
+            line.textContent = text;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function executeCommand() {
+            const command = commandInput.value.trim();
+            if (!command) return;
+            
+            commandHistory.push(command);
+            historyIndex = commandHistory.length;
+            
+            addOutput('$ ' + command, 'command-line');
+            
+            execBtn.disabled = true;
+            commandInput.disabled = true;
+            
+            fetch('/exec', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'command=' + encodeURIComponent(command)
+            })
+            .then(response => response.text())
+            .then(result => {
+                if (result.trim()) {
+                    const lines = result.split('\n');
+                    lines.forEach(line => {
+                        if (line.trim()) {
+                            addOutput(line);
+                        }
+                    });
+                } else {
+                    addOutput('(no output)', 'success-line');
+                }
+            })
+            .catch(error => {
+                addOutput('Error: ' + error.message, 'error-line');
+            })
+            .finally(() => {
+                execBtn.disabled = false;
+                commandInput.disabled = false;
+                commandInput.value = '';
+                commandInput.focus();
+            });
+        }
+        
+        execBtn.addEventListener('click', executeCommand);
+        
+        commandInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                executeCommand();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    commandInput.value = commandHistory[historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    commandInput.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = commandHistory.length;
+                    commandInput.value = '';
+                }
+            }
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            output.innerHTML = '';
+            commandInput.value = '';
+            commandInput.focus();
+        });
+        
+        addOutput('QuickShip Terminal Ready', 'success-line');
+        addOutput('Type commands and press Enter or click Execute', 'success-line');
+        addOutput('');
+    </script>
+</body>
+</html>
+HTML
+    
+    my $response = "HTTP/1.1 200 OK\r\n";
+    $response .= "Content-Type: text/html\r\n";
+    $response .= "Content-Length: " . length($html) . "\r\n";
+    $response .= "Connection: close\r\n\r\n";
+    $response .= $html;
+    
+    print $client $response;
+}
+
+# Handle command execution
+sub handle_command {
+    my ($client, $request) = @_;
+    
+    # Extract Content-Length
+    my ($content_length) = $request =~ /Content-Length:\s*(\d+)/i;
+    unless ($content_length) {
+        send_error($client, "No Content-Length header");
+        return;
+    }
+    
+    # Read body
+    my $body = '';
+    read($client, $body, $content_length);
+    
+    # Parse command
+    my ($command) = $body =~ /command=([^&]+)/;
+    unless ($command) {
+        send_error($client, "No command provided");
+        return;
+    }
+    
+    # URL decode
+    $command =~ s/\+/ /g;
+    $command =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+    
+    # Execute command
+    my $output = `$command 2>&1`;
+    
+    # Send response
+    my $response = "HTTP/1.1 200 OK\r\n";
+    $response .= "Content-Type: text/plain\r\n";
+    $response .= "Content-Length: " . length($output) . "\r\n";
+    $response .= "Connection: close\r\n\r\n";
+    $response .= $output;
     
     print $client $response;
 }
